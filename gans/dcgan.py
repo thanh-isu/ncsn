@@ -47,8 +47,38 @@ class Generator(nn.Module):
         else:
             output = self.main(input)
         return output
+'''
+class Discriminator(nn.Module):
+    def __init__(self, ngpu):
+        super(Discriminator, self).__init__()
+        self.ngpu = ngpu
+        self.main = nn.Sequential(
+            # input is (nc) x 64 x 64
+            nn.Conv2d(nc, ndf, 4, 2, 1, bias=False),
+            nn.LeakyReLU(0.2, inplace=True),
+            # state size. (ndf) x 32 x 32
+            nn.Conv2d(ndf, ndf * 2, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(ndf * 2),
+            nn.LeakyReLU(0.2, inplace=True),
+            # state size. (ndf*2) x 16 x 16
+            nn.Conv2d(ndf * 2, ndf * 4, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(ndf * 4),
+            nn.LeakyReLU(0.2, inplace=True),
+            # state size. (ndf*4) x 8 x 8
+            nn.Conv2d(ndf * 4, ndf * 8, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(ndf * 8),
+            nn.LeakyReLU(0.2, inplace=True),
+            # state size. (ndf*8) x 4 x 4
+            nn.Conv2d(ndf * 8, 1, 4, 1, 0, bias=False),
+            nn.Sigmoid()
+        )
 
-
+    def forward(self, input):
+        print("input shape",input.shape)
+        op = self.main(input).squeeze()
+        print("output shape",op.shape)
+        return op
+'''    
 class Discriminator(nn.Module):
     def __init__(self, ngpu, nc=1, ndf=64):
         super(Discriminator, self).__init__()
@@ -75,8 +105,10 @@ class Discriminator(nn.Module):
             output = nn.parallel.data_parallel(self.main, input, range(self.ngpu))
         else:
             output = self.main(input)
-        return output.view(-1, 1).squeeze(1)
-    
+        op = output.view(-1, 1).squeeze(1)
+        return op
+
+
 if __name__ == '__main__':    
 
     parser = argparse.ArgumentParser()
@@ -181,6 +213,7 @@ if __name__ == '__main__':
             label = torch.full((batch_size,), real_label, device=device)
 
             output = netD(real_cpu)
+
             errD_real = criterion(output, label)
             errD_real.backward()
             D_x = output.mean().item()
@@ -188,10 +221,14 @@ if __name__ == '__main__':
             # train with fake
             noise = torch.randn(batch_size, nz, 1, 1, device=device)
             fake = netG(noise)
-            label.fill_(fake_label)
+            label.fill_(fake_label)            
             output = netD(fake.detach())
+                        
             errD_fake = criterion(output, label)
+            
+            
             errD_fake.backward()
+            
             D_G_z1 = output.mean().item()
             errD = errD_real + errD_fake
             optimizerD.step()
